@@ -338,7 +338,14 @@ module parallella (/*AUTOARG*/
    wire [31:0] 	    elink_dstaddr_inb;
    wire [31:0] 	    elink_dstaddr_tmp;
    wire 	    ext_mem_access;
-      
+   
+   // Parallella ws
+   wire        east_p0;   
+   wire        east_p1;   
+   wire        east_p2;   
+   wire        east_p3;   
+   wire        east_p4;   
+         
    //#################
    //# global signals
    //#################
@@ -514,10 +521,23 @@ module parallella (/*AUTOARG*/
    assign ext_mem_access = (elink_dstaddr_tmp[31:28] == `VIRT_EXT_MEM) &
 			  ~(elink_dstaddr_tmp[31:20] == `AXI_COORD);
    
-   assign elink_dstaddr_inb[31:28] = ext_mem_access ? `PHYS_EXT_MEM :
-			                              elink_dstaddr_tmp[31:28];
+   // Check special spot
+   //   wire        east_p0;   
+   assign east_p0 = elink_dstaddr_tmp[31:20] == 12'h012;    // (row,col) = (0   , 12)
+   assign east_p1 = elink_dstaddr_tmp[31:20] == 12'h03F;    // (row,col) = (0   , 0x3F)
+   assign east_p2 = elink_dstaddr_tmp[31:20] == 12'hFD2;    // (row,col) = (0x3F, 12)
+   assign east_p3 = elink_dstaddr_tmp[31:20] == 12'hFFF;    // (row,col) = (0x3F, 0x3F)
+   assign east_p4 = elink_dstaddr_tmp[31:20] == 12'h8A0;    // (row,col) = (0x22, 0x20)
+   
+   assign elink_dstaddr_inb[31:28] = (ext_mem_access | east_p0 | east_p1 | east_p2 | east_p3 | east_p4)
+                                     ? `PHYS_EXT_MEM : elink_dstaddr_tmp[31:28];
 
-   assign elink_dstaddr_inb[27:0] = elink_dstaddr_tmp[27:0];
+   assign elink_dstaddr_inb[27:0] = east_p0 ? 28'hE10_0000 : 
+                                    east_p1 ? 28'hE10_1000 :
+                                    east_p2 ? 28'hE10_2000 :
+                                    east_p3 ? 28'hE10_3000 :
+                                    east_p4 ? 28'hE10_4000 :
+                                              elink_dstaddr_tmp[27:0];
       
    /*ewrapper_link_top AUTO_TEMPLATE(.emesh_clk_inb (rxi_eclk),
                                      .burst_en      (1'b1),
